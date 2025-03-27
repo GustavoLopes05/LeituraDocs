@@ -1,70 +1,49 @@
 ﻿using System;
-using System.IO;
 using System.Drawing;
+using System.IO;
 using PdfiumViewer;
 using ZXing;
+using System.Text.RegularExpressions;
 
 class Program
 {
     static void Main()
     {
-        string pasta = @"C:\Gustavo\LeituraDocs\Docs"; // Substituir pelo caminho real
-        ListarEProcessarPDFs(pasta);
-    }
+        string pastaPDFs = @"C:\Gustavo\LeituraDocs\Docs"; // Caminho da pasta com PDFs
+        string[] arquivosPDF = Directory.GetFiles(pastaPDFs, "*.pdf");
 
-    static void ListarEProcessarPDFs(string pasta)
-    {
-        if (!Directory.Exists(pasta))
+        foreach (var pdfPath in arquivosPDF)
         {
-            Console.WriteLine("A pasta não existe!");
-            return;
-        }
-
-        string[] arquivos = Directory.GetFiles(pasta, "*.pdf");
-        foreach (string arquivo in arquivos)
-        {
-            Console.WriteLine($"Processando: {arquivo}");
-            LerQRCodeDePDF(arquivo);
+            Console.WriteLine($"Processando: {Path.GetFileName(pdfPath)}");
+            LerQRCodeDePDF(pdfPath);
         }
     }
 
-    static void LerQRCodeDePDF(string caminhoPDF)
+    static void LerQRCodeDePDF(string pdfPath)
     {
-        try
+        using (PdfDocument pdf = PdfDocument.Load(pdfPath))
         {
-            using (var pdfDoc = PdfDocument.Load(caminhoPDF))
+            for (int i = 0; i < pdf.PageCount; i++)  // Percorre as páginas
             {
-                for (int i = 0; i < pdfDoc.PageCount; i++)
+                using (var imagem = pdf.Render(i, 300, 300, PdfRenderFlags.CorrectFromDpi))
                 {
-                    using (var imagem = pdfDoc.Render(i, 300, 300, true)) // Renderiza a página como imagem
+                    var leitor = new BarcodeReader();
+                    var resultado = leitor.Decode((Bitmap)imagem);
+
+                    if (resultado != null)
                     {
-                        Bitmap bitmap = new Bitmap(imagem);
-                        string qrTexto = LerQRCode(bitmap);
-                        if (!string.IsNullOrEmpty(qrTexto))
+                        // Usando Split para dividir a string
+                        string[] partes = resultado.Text.Split('*');  // Divide a string onde encontrar o '*'
+
+                        // Exibindo as partes divididas no console
+                        foreach (string parte in partes)
                         {
-                            Console.WriteLine($"Página {i + 1}: QR Code encontrado -> {qrTexto}");
+                            Console.WriteLine(parte);  // Imprime cada parte
                         }
                     }
                 }
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erro ao processar {caminhoPDF}: {ex.Message}");
-        }
-    }
-
-    static string LerQRCode(Bitmap imagem)
-    {
-        try
-        {
-            BarcodeReader leitor = new BarcodeReader();
-            var resultado = leitor.Decode(imagem);
-            return resultado?.Text;
-        }
-        catch
-        {
-            return null;
-        }
     }
 }
+
